@@ -1,0 +1,11 @@
+# nunca publicar: senhas, banco de dados e ambiente local
+.streamlit/secrets.toml
+dados/
+.venv/
+__pycache__/
+*.pyc
+*.db
+*.db-*
+*.xlsx
+*.xlsm
+*.xls

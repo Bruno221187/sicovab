@@ -1,0 +1,14 @@
+# Configurações do Controle Sicovab.  Depois de mudar, recarregue a página no navegador.
+
+[regras]
+prazo_aceite_dias = 14      # dias após a carga para aceitar a nota no Sicovab
+alerta_dias = 3             # avisar quando faltar até X dias para vencer
+estoque_parado_dias = 365   # estoque "parado" a partir de X dias da emissão
+
+# Usuários e senhas NÃO ficam aqui: ficam em .streamlit\secrets.toml (no computador)
+# ou na tela "Secrets" do Streamlit Community Cloud (na nuvem).
+
+[listas]
+motivos_rejeicao = ["Não localizado Recebimento", "Peça Devolvida", "Fornecedor divergente",
+                    "Quantidade divergente", "Nota cancelada"]
+obs_nao_localizada = ["Aguardando recebimento", "Aguardando fornecedor", "Rejeitar", "Resolvido"]
