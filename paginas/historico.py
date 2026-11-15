@@ -6,12 +6,13 @@ from core import db, ui
 ui.exige_login()
 st.title("Histórico")
 
-with st.expander("Backup completo dos dados", icon=":material/backup:"):
-    st.caption("Baixa todas as tabelas do sistema num Excel (uma aba por tabela). Bom guardar um por semana.")
-    if st.button("Gerar backup"):
-        st.download_button("Baixar backup", data=db.backup_excel(), icon=":material/download:",
-                           file_name=f"Backup Controle Sicovab {pd.Timestamp.now():%d-%m-%Y %Hh%M}.xlsx",
-                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+if ui.e_administrador():
+    with st.expander("Backup completo dos dados", icon=":material/backup:"):
+        st.caption("Baixa todas as tabelas do sistema num Excel (uma aba por tabela). Bom guardar um por semana.")
+        if st.button("Gerar backup"):
+            st.download_button("Baixar backup", data=db.backup_excel(), icon=":material/download:",
+                               file_name=f"Backup Controle Sicovab {pd.Timestamp.now():%d-%m-%Y %Hh%M}.xlsx",
+                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 h = db.ler("SELECT quando, usuario, acao, referencia, detalhe FROM historico ORDER BY id DESC")
 if h.empty:

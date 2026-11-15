@@ -25,9 +25,9 @@ if not exist "%USERPROFILE%\.streamlit\credentials.toml" (
 )
 
 echo.
+rem so este computador acessa (seguranca): os outros usam o endereco da nuvem
 echo Controle Sicovab rodando. Neste computador: http://localhost:8501
-for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do for /f "tokens=1" %%b in ("%%a") do echo Em outro computador da rede: http://%%b:8501
 echo Para encerrar, feche esta janela.
 echo.
-".venv\Scripts\python.exe" -m streamlit run app.py --server.address 0.0.0.0 --server.port 8501 --server.headless false --browser.serverAddress localhost
+".venv\Scripts\python.exe" -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501 --server.headless false --browser.serverAddress localhost
 pause

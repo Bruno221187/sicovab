@@ -2,6 +2,9 @@
 
 Uso:  .venv\\Scripts\\python.exe enviar_para_nuvem.py            (só envia se o banco online estiver vazio)
       .venv\\Scripts\\python.exe enviar_para_nuvem.py --forcar   (apaga o que houver no online e envia de novo)
+
+Precisa do endereço do DONO do banco (neondb_owner, pego no site do Neon) na variável DATABASE_URL:
+o usuário do app (sicovab_app) não pode apagar o Histórico, de propósito.
 """
 import argparse
 import sqlite3

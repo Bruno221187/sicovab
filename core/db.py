@@ -66,6 +66,9 @@ CREATE TABLE IF NOT EXISTS importacoes (
 CREATE TABLE IF NOT EXISTS senhas (
     usuario TEXT PRIMARY KEY, sal TEXT NOT NULL, hash TEXT NOT NULL, alterado_em TEXT
 );
+CREATE TABLE IF NOT EXISTS tentativas_login (
+    usuario TEXT PRIMARY KEY, falhas INTEGER NOT NULL, bloqueado_ate TEXT
+);
 CREATE INDEX IF NOT EXISTS ix_nbs_nf ON nbs(nf);
 CREATE INDEX IF NOT EXISTS ix_fu_serial ON follow_up(serial);
 """
@@ -168,8 +171,19 @@ def _schema(pg: bool) -> list[str]:
     return [c.strip() for c in s.split(";") if c.strip()]
 
 
+TABELAS_SISTEMA = ["notas_sicovab", "nbs", "nbs_jack", "estoque", "follow_up", "decisoes",
+                   "historico", "importacoes", "senhas", "tentativas_login"]
+
+
 def iniciar():
+    """Cria as tabelas que faltarem. No banco online o app usa um usuário sem permissão de criar tabelas,
+    então só tenta criar se faltar alguma (nesse caso, rode uma vez com o usuário dono do banco)."""
     with conectar() as con:
+        if con.pg:
+            existentes = {r[0] for r in con.execute(
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema()").fetchall()}
+            if set(TABELAS_SISTEMA) <= existentes:
+                return
         for comando in _schema(con.pg):
             con.execute(comando)
 
@@ -193,12 +207,58 @@ def _hash(senha: str, sal: str) -> str:
     return hashlib.pbkdf2_hmac("sha256", senha.encode("utf-8"), bytes.fromhex(sal), 200_000).hex()
 
 
+def _iguais(a: str, b: str) -> bool:
+    # compara em bytes: assim aceita acentos e não revela pelo tempo de resposta quantas letras acertou
+    return hmac.compare_digest(str(a).encode("utf-8"), str(b).encode("utf-8"))
+
+
 def conferir_senha(usuario: str, senha: str, senha_config: str) -> bool:
     with conectar() as con:
         linha = con.execute("SELECT sal, hash FROM senhas WHERE usuario=?", (usuario,)).fetchone()
     if linha:
-        return hmac.compare_digest(_hash(senha, linha[0]), linha[1])
-    return hmac.compare_digest(str(senha_config), senha)
+        return _iguais(_hash(senha, linha[0]), linha[1])
+    return bool(senha_config) and _iguais(senha_config, senha)
+
+
+def usa_senha_inicial(usuario: str) -> bool:
+    """True enquanto o usuário ainda não trocou a senha inicial (a que está nos segredos)."""
+    with conectar() as con:
+        return con.execute("SELECT 1 FROM senhas WHERE usuario=?", (usuario,)).fetchone() is None
+
+
+# Contra quem tenta adivinhar senha: depois de MAX_FALHAS erros seguidos, o usuário fica bloqueado alguns minutos.
+MAX_FALHAS = 5
+MINUTOS_BLOQUEIO = 5
+
+
+def minutos_bloqueado(usuario: str) -> int:
+    """Quantos minutos faltam para o usuário poder tentar de novo (0 = liberado)."""
+    with conectar() as con:
+        r = con.execute("SELECT bloqueado_ate FROM tentativas_login WHERE usuario=?", (usuario,)).fetchone()
+    if not r or not r[0]:
+        return 0
+    falta = (dt.datetime.fromisoformat(r[0]) - dt.datetime.now()).total_seconds()
+    return max(0, int(falta // 60) + 1) if falta > 0 else 0
+
+
+def registrar_falha_login(usuario: str):
+    with conectar() as con:
+        r = con.execute("SELECT falhas FROM tentativas_login WHERE usuario=?", (usuario,)).fetchone()
+        falhas = (r[0] if r else 0) + 1
+        bloqueio = None
+        if falhas >= MAX_FALHAS:
+            bloqueio = (dt.datetime.now() + dt.timedelta(minutes=MINUTOS_BLOQUEIO)).strftime("%Y-%m-%d %H:%M:%S")
+            falhas = 0
+            registrar(con, usuario, "Login bloqueado", usuario, f"{MAX_FALHAS} senhas erradas seguidas")
+        con.execute("""INSERT INTO tentativas_login(usuario, falhas, bloqueado_ate) VALUES (?,?,?)
+                       ON CONFLICT(usuario) DO UPDATE SET falhas=excluded.falhas,
+                       bloqueado_ate=COALESCE(excluded.bloqueado_ate, tentativas_login.bloqueado_ate)""",
+                    (usuario, falhas, bloqueio))
+
+
+def limpar_falhas_login(usuario: str):
+    with conectar() as con:
+        con.execute("DELETE FROM tentativas_login WHERE usuario=?", (usuario,))
 
 
 def trocar_senha(usuario: str, nova: str):
@@ -336,6 +396,9 @@ def substituir_followup(linhas: pd.DataFrame, arquivo: str, usuario: str):
 def atualizar_followup(id_: int, campos: dict, usuario: str):
     if not campos:
         return
+    invalidos = set(campos) - set(CAMPOS_FU)  # o nome da coluna entra no SQL: só aceita as colunas conhecidas
+    if invalidos:
+        raise ValueError(f"Campo(s) não editável(is): {', '.join(map(str, invalidos))}")
     sets = ", ".join(f"{k}=?" for k in campos)
     with conectar() as con:
         con.execute(f"UPDATE follow_up SET {sets}, atualizado_por=?, atualizado_em=? WHERE id=?",

@@ -3,7 +3,7 @@ import streamlit as st
 
 from core import db, importar as imp, ui
 
-ui.exige_login()
+ui.exige_administrador()
 st.title("Importar relatórios")
 st.markdown(
     "**Rotina:**  \n"

@@ -50,7 +50,7 @@ else:
     esq, dir_ = st.columns([3, 2], gap="medium")
     with esq.container(border=True):
         st.markdown("**Notas por fornecedor**")
-        st.dataframe(r["por_fornecedor"], hide_index=True, use_container_width=True, column_config={
+        st.dataframe(r["por_fornecedor"], hide_index=True, width="stretch", column_config={
             "Notas": ui.col_num("Notas"),
             "Vence logo": st.column_config.NumberColumn(f"Vence ≤ {alerta}d")})
     with dir_.container(border=True):
@@ -64,7 +64,7 @@ else:
             tooltip=[alt.Tooltip("Status:N"), alt.Tooltip("rotulo:N", title="Notas")])
         barras = base.mark_bar(color=COR_NOTAS, cornerRadiusEnd=4, height=16)
         rotulos = base.mark_text(align="left", dx=4, color=TINTA_2, fontSize=12).encode(text="rotulo:N")
-        st.altair_chart((barras + rotulos).properties(height=alt.Step(28)), use_container_width=True)
+        st.altair_chart((barras + rotulos).properties(height=alt.Step(28)), width="stretch")
 
 # ================================================================ ESTOQUE
 st.subheader(":material/inventory_2: Estoque Sicovab", divider="blue")
@@ -97,9 +97,9 @@ else:
             align="left", dx=4, color=TINTA_2, fontSize=12).encode(
             y=y, x="Itens:Q", text="rotulo:N",
             tooltip=[alt.Tooltip("Fornecedor:N"), alt.Tooltip("rotulo:N", title="Total")])
-        st.altair_chart((barras + totais).properties(height=alt.Step(26)), use_container_width=True)
+        st.altair_chart((barras + totais).properties(height=alt.Step(26)), width="stretch")
 
-        st.dataframe(ef, hide_index=True, use_container_width=True, height=(len(ef) + 1) * 35 + 3, column_config={
+        st.dataframe(ef, hide_index=True, width="stretch", height=(len(ef) + 1) * 35 + 3, column_config={
             "Fornecedor": st.column_config.TextColumn("Fornecedor", width="large"),
             "Itens": st.column_config.NumberColumn("Itens", format="%d", width="small"),
             "Disponíveis": st.column_config.NumberColumn("🟢 Disponíveis", format="%d", width="small"),
@@ -131,7 +131,7 @@ with dir_.container(border=True):
                  "followup": "Follow UP Vidros"}
         imp["tipo"] = imp["tipo"].map(nomes).fillna(imp["tipo"])
         imp["quando"] = pd.to_datetime(imp["quando"])
-        st.dataframe(imp[["tipo", "quando", "linhas", "usuario"]], hide_index=True, use_container_width=True,
+        st.dataframe(imp[["tipo", "quando", "linhas", "usuario"]], hide_index=True, width="stretch",
                      column_config={"tipo": "Relatório",
                                     "quando": st.column_config.DatetimeColumn("Quando", format="DD/MM/YYYY HH:mm"),
                                     "linhas": ui.col_num("Linhas"), "usuario": "Por"})

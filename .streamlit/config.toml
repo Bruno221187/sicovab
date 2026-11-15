@@ -1,6 +1,14 @@
 [browser]
 gatherUsageStats = false
 
+[client]
+# não mostra detalhes técnicos de erro na tela (podem revelar o endereço do banco)
+showErrorDetails = "none"
+
+[server]
+# tamanho máximo de cada Excel enviado, em MB
+maxUploadSize = 25
+
 [theme]
 base = "light"
 primaryColor = "#1F3864"

@@ -15,7 +15,7 @@ ARQUIVO_SEGREDOS = BASE / ".streamlit" / "secrets.toml"
 PADRAO = {
     "regras": {"prazo_aceite_dias": 14, "alerta_dias": 3, "estoque_parado_dias": 365},
     "usuarios": {},
-    "acesso": {"exigir_login": False},
+    "acesso": {"exigir_login": True, "administradores": []},
     "listas": {
         "motivos_rejeicao": ["Não localizado Recebimento", "Peça Devolvida"],
         "obs_nao_localizada": ["Aguardando recebimento", "Aguardando fornecedor", "Rejeitar"],

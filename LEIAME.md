@@ -1,14 +1,15 @@
 # Controle Sicovab – SBR
 
 Sistema simples (Python + Streamlit + SQLite) que substitui a planilha *Validação Sicovab SBR.xlsm*.
-Ele roda em um computador e as outras pessoas da rede acessam pelo navegador.
+Na nuvem, cada pessoa acessa pelo endereço do Streamlit Cloud. O `iniciar.bat` abre o sistema só no próprio computador.
 
 ## 1. Instalação (uma vez só)
 
 1. Instale o **Python 3.12** em https://www.python.org/downloads/
    Na primeira tela do instalador, marque **"Add python.exe to PATH"**.
 2. Copie esta pasta para o computador que vai rodar o sistema (ex.: `C:\ControleSicovab`).
-3. Abra o `config.toml` no Bloco de Notas e **troque os nomes e as senhas** dos usuários.
+3. Abra o `.streamlit\secrets.toml` no Bloco de Notas e **troque os nomes e as senhas iniciais** dos usuários
+   (uma diferente para cada pessoa). No primeiro acesso o sistema obriga cada um a criar a própria senha (mínimo 8 caracteres).
 4. Dê dois cliques em **`iniciar.bat`**. Na primeira vez ele baixa o que precisa (alguns minutos, precisa de internet).
    O navegador abre sozinho em http://localhost:8501.
 
@@ -22,12 +23,14 @@ Notas rejeitadas (com data e motivo).
 
 | Tela | Quem vê | Para quê |
 |---|---|---|
-| **Painel** | todos | Resumo: notas por status, vencimentos, pendências por fornecedor, estoque e Follow UP |
-| **Estoque Sicovab** | todos | Consultar com filtros e **exportar para Excel** |
-| **Importar relatórios** | com login | Enviar os Excel do Sicovab, do NBS e do Follow UP (pode mandar vários de uma vez) |
+| **Painel** | com login* | Resumo: notas por status, vencimentos, pendências por fornecedor, estoque e Follow UP |
+| **Estoque Sicovab** | com login* | Consultar com filtros e **exportar para Excel** |
+| **Importar relatórios** | administradores** | Enviar os Excel do Sicovab, do NBS e do Follow UP (pode mandar vários de uma vez) |
 | **Notas Sicovab** | com login | Conferência; aba **Aceitar no Sicovab** com as chaves prontas para copiar; marcar notas como aceita, rejeitada ou não localizada; desfazer |
 | **Follow UP Vidros** | com login | Lançar peças (avisa serial repetido e se o serial existe no estoque), editar, excluir, importar em lote |
-| **Histórico** | com login | Quem fez o quê e quando |
+| **Histórico** | com login | Quem fez o quê e quando (o backup completo só aparece para administradores**) |
+
+\* Enquanto `exigir_login = true` nos segredos (padrão).  \*\* Lista `administradores` nos segredos; se estiver vazia, todos os usuários logados.
 
 Rotina:
 1. Importar **Notas Sicovab + NBS** → em **Notas Sicovab > Aceitar no Sicovab**, copiar cada chave, dar o aceite no Sicovab e marcar como feito.
@@ -38,10 +41,11 @@ Para só acrescentar peças novas, use *Follow UP Vidros > Importar em lote*.
 
 ## 4. Acessar de outro computador
 
-Quando o `iniciar.bat` está aberto, ele mostra o endereço para a rede (ex.: `http://192.168.0.15:8501`).
-A outra pessoa abre esse endereço no navegador. O computador que roda o sistema precisa ficar ligado com a janela aberta.
-Se não abrir, o Firewall do Windows pode estar bloqueando: na primeira execução, aceite o aviso
-"Permitir acesso" para redes privadas (ou peça para a TI liberar a porta 8501).
+Use o endereço do sistema na nuvem (Streamlit Cloud). Por segurança, o `iniciar.bat` só abre o sistema
+no próprio computador (http://localhost:8501): ele não fica visível para a rede.
+
+**Segurança do login:** depois de 5 senhas erradas seguidas, o usuário fica bloqueado por 5 minutos
+(isso fica registrado no Histórico).
 
 ## 5. Regras de status das notas
 

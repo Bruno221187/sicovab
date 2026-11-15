@@ -9,3 +9,6 @@ __pycache__/
 *.xlsx
 *.xlsm
 *.xls
+
+# configuração local do Claude
+.claude/
