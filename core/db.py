@@ -86,6 +86,8 @@ def agora() -> str:
 
 def url_banco() -> str | None:
     """Endereço do PostgreSQL online, se configurado. Sem ele, usa o SQLite local."""
+    if os.environ.get("SICOVAB_LOCAL") == "1":  # testes: força o banco local, mesmo com a nuvem configurada
+        return None
     url = os.environ.get("DATABASE_URL") or config.segredos().get("database", {}).get("url")
     return url.strip() if url else None
 
@@ -339,18 +341,24 @@ def backup(manter: int = 30):
 
 # ---------------------------------------------------------------- decisões sobre notas
 def marcar_notas(notas: pd.DataFrame, situacao: str, motivo: str, obs: str, usuario: str):
-    """notas: linhas da conferência (precisam de chave, numero, emitente, carga, saldo)."""
+    """notas: linhas da conferência (precisam de chave, numero, fornecedor/emitente, carga, saldo)."""
     with conectar() as con:
         for _, n in notas.iterrows():
+            # a conferência chama a coluna de "fornecedor"; o relatório original, de "emitente"
+            fornecedor = n.get("emitente") or n.get("fornecedor") or None
             con.execute(
                 """INSERT INTO decisoes(chave, situacao, motivo, obs, data, usuario, numero, emitente, carga, saldo)
                    VALUES (?,?,?,?,?,?,?,?,?,?)
                    ON CONFLICT(chave) DO UPDATE SET situacao=excluded.situacao, motivo=excluded.motivo,
-                   obs=excluded.obs, data=excluded.data, usuario=excluded.usuario""",
+                   obs=excluded.obs, data=excluded.data, usuario=excluded.usuario,
+                   numero=COALESCE(excluded.numero, decisoes.numero),
+                   emitente=COALESCE(excluded.emitente, decisoes.emitente),
+                   carga=COALESCE(excluded.carga, decisoes.carga),
+                   saldo=COALESCE(excluded.saldo, decisoes.saldo)""",
                 (n["chave"], situacao, motivo, obs, dt.date.today().isoformat(), usuario,
-                 _int(n.get("numero")), n.get("emitente"), _txt_data(n.get("carga")), _float(n.get("saldo"))),
+                 _int(n.get("numero")), fornecedor, _txt_data(n.get("carga")), _float(n.get("saldo"))),
             )
-            registrar(con, usuario, f"Nota: {situacao}", f"NF {_int(n.get('numero'))} - {n.get('emitente')}",
+            registrar(con, usuario, f"Nota: {situacao}", f"NF {_int(n.get('numero'))} - {fornecedor or ''}",
                       " / ".join(x for x in (motivo, obs) if x))
 
 

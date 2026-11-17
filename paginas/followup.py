@@ -60,7 +60,9 @@ with aba_cons:
         st.info("Nenhuma peça lançada ainda.")
     else:
         f1, f2, f3 = st.columns([2, 2, 4])
-        sel_status = f1.multiselect("Situação no Sicovab", ["Disponível", "Baixado"], default=["Disponível", "Baixado"])
+        sel_status = f1.multiselect("Situação no Sicovab", ["Disponível", "Baixar RNC", "Baixado"],
+                                    default=["Disponível", "Baixar RNC", "Baixado"],
+                                    help="Baixar RNC = a O.S tem 'RNC' e a peça ainda está no estoque do Sicovab.")
         so_dup = f2.checkbox("Só seriais repetidos")
         busca = f3.text_input("Buscar (veículo, serial, NF, O.S)")
         v = fu[fu["status"].isin(sel_status)]

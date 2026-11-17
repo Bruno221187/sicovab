@@ -12,7 +12,7 @@ ORDEM_STATUS = ["Aceitar", "Parcial", "Divergente", "Verificar fornecedor", "Ver
 FINALIZADAS = ["Aceita", "Rejeitada"]  # já tratadas: não contam como pendência
 ICONE = {"Aceitar": "🟢", "Parcial": "🟡", "Divergente": "🟠", "Verificar fornecedor": "🟠",
          "Verificar NBS Jack": "🟠", "Não localizada": "🟣", "Não recebido": "🔴", "Aceita": "✅", "Rejeitada": "⚫",
-         "Disponível": "🟢", "Produção": "🔵", "Baixado": "⚫"}
+         "Disponível": "🟢", "Produção": "🔵", "Baixado": "⚫", "Baixar RNC": "🟠"}
 
 
 def hoje() -> pd.Timestamp:
@@ -84,15 +84,24 @@ def conferir_notas(prazo: int, alerta: int) -> pd.DataFrame:
     return n[COLUNAS_NOTAS].sort_values(["dias", "numero"], na_position="last").reset_index(drop=True)
 
 
+def _completar_fornecedor(d: pd.DataFrame) -> pd.DataFrame:
+    """Notas gravadas sem fornecedor (erro antigo): busca o nome no relatório de Notas Sicovab pela chave."""
+    if d.empty or not d["emitente"].isna().any():
+        return d
+    nomes = db.ler("SELECT chave, emitente FROM notas_sicovab").drop_duplicates("chave").set_index("chave")["emitente"]
+    d["emitente"] = d["emitente"].fillna(d["chave"].map(nomes))
+    return d
+
+
 def notas_rejeitadas() -> pd.DataFrame:
-    d = db.ler("SELECT * FROM decisoes WHERE situacao='Rejeitada' ORDER BY data DESC")
+    d = _completar_fornecedor(db.ler("SELECT * FROM decisoes WHERE situacao='Rejeitada' ORDER BY data DESC"))
     for c in ("data", "carga"):
         d[c] = pd.to_datetime(d[c], errors="coerce")
     return d
 
 
 def notas_nao_localizadas(conferencia: pd.DataFrame, prazo: int) -> pd.DataFrame:
-    d = db.ler("SELECT * FROM decisoes WHERE situacao='Não localizada' ORDER BY data DESC")
+    d = _completar_fornecedor(db.ler("SELECT * FROM decisoes WHERE situacao='Não localizada' ORDER BY data DESC"))
     d["carga"] = pd.to_datetime(d["carga"], errors="coerce")
     d["data"] = pd.to_datetime(d["data"], errors="coerce")
     d["expira"] = d["carga"] + pd.Timedelta(days=prazo)
@@ -123,7 +132,9 @@ def estoque(parado_dias: int) -> pd.DataFrame:
     es["chave_repetida"] = es["chave_nf_serial"].ne("") & es["chave_nf_serial"].duplicated(keep=False)
     com_os = fu[fu["os"].fillna("") != ""].groupby("chave")["os"].first() if not fu.empty else pd.Series(dtype=str)
     es["os"] = es["chave_nf_serial"].map(com_os).fillna("")
-    es["status"] = np.where(es["os"] != "", "Produção", "Disponível")
+    # mesma regra do Follow UP: O.S com "RNC" = precisa dar baixa por RNC
+    rnc = es["os"].str.upper().str.contains("RNC", regex=False)
+    es["status"] = np.select([rnc, es["os"] != ""], ["Baixar RNC", "Produção"], default="Disponível")
     es["icone"] = es["status"].map(ICONE)
     es["emissao"] = pd.to_datetime(es["emissao"], errors="coerce")
     es["dias_estoque"] = (hoje() - es["emissao"]).dt.days
@@ -134,7 +145,8 @@ def estoque(parado_dias: int) -> pd.DataFrame:
 
 def estoque_por_fornecedor(es: pd.DataFrame) -> pd.DataFrame:
     """Peças do Estoque Sicovab por fornecedor: disponíveis, em produção, paradas e a mais antiga."""
-    cols = ["Fornecedor", "Itens", "Disponíveis", "Em produção", "Parados", "Participação", "Mais antigo (dias)"]
+    cols = ["Fornecedor", "Itens", "Disponíveis", "Em produção", "Baixar RNC", "Parados", "Participação",
+            "Mais antigo (dias)"]
     if es.empty:
         return pd.DataFrame(columns=cols)
     nome = es["fornecedor"].map(lambda v: separar_emitente(v)[1] or "Sem fornecedor")
@@ -143,6 +155,7 @@ def estoque_por_fornecedor(es: pd.DataFrame) -> pd.DataFrame:
         "Itens": g.size(),
         "Disponíveis": g["status"].apply(lambda s: int((s == "Disponível").sum())),
         "Em produção": g["status"].apply(lambda s: int((s == "Produção").sum())),
+        "Baixar RNC": g["status"].apply(lambda s: int((s == "Baixar RNC").sum())),
         "Parados": g["parado"].sum().astype(int),
         "Mais antigo (dias)": g["dias_estoque"].max(),
     })
@@ -156,7 +169,10 @@ def followup() -> pd.DataFrame:
         return fu.assign(icone=None, status=None, duplicado=None)
     es = db.ler("SELECT nf, serial FROM estoque")
     chaves_estoque = set(chave_nf_serial(es["nf"], es["serial"])) if not es.empty else set()
-    fu["status"] = np.where(fu["chave"].isin(chaves_estoque), "Disponível", "Baixado")
+    # O.S com "RNC" (ex.: "7932 (RNC)") e a peça ainda no Sicovab = precisa dar baixa por RNC
+    rnc = fu["os"].fillna("").astype(str).str.upper().str.contains("RNC", regex=False)
+    no_sicovab = fu["chave"].isin(chaves_estoque)
+    fu["status"] = np.select([no_sicovab & rnc, no_sicovab], ["Baixar RNC", "Disponível"], default="Baixado")
     fu["icone"] = fu["status"].map(ICONE)
     s = fu["serial"].fillna("").str.upper().str.strip()
     fu["duplicado"] = s.ne("") & s.duplicated(keep=False)
@@ -204,9 +220,11 @@ def resumo(cfg: dict) -> dict:
         "estoque_total": len(es),
         "estoque_disp": int((es.get("status") == "Disponível").sum()) if len(es) else 0,
         "estoque_prod": int((es.get("status") == "Produção").sum()) if len(es) else 0,
+        "estoque_rnc": int((es.get("status") == "Baixar RNC").sum()) if len(es) else 0,
         "estoque_parado": int(es["parado"].sum()) if len(es) else 0,
         "fu_total": len(fu),
-        "fu_disp": int((fu.get("status") == "Disponível").sum()) if len(fu) else 0,
+        "fu_disp": int(fu.get("status").isin(["Disponível", "Baixar RNC"]).sum()) if len(fu) else 0,
+        "fu_rnc": int((fu.get("status") == "Baixar RNC").sum()) if len(fu) else 0,
         "fu_baixado": int((fu.get("status") == "Baixado").sum()) if len(fu) else 0,
         "fu_duplicado": int(fu["duplicado"].sum()) if len(fu) else 0,
     }

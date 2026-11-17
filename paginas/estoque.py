@@ -12,7 +12,9 @@ if es.empty:
     st.stop()
 
 f1, f2, f3, f4 = st.columns([2, 2, 3, 3])
-sel_status = f1.multiselect("Status", ["Disponível", "Produção"], default=["Disponível", "Produção"])
+sel_status = f1.multiselect("Status", ["Disponível", "Produção", "Baixar RNC"],
+                            default=["Disponível", "Produção", "Baixar RNC"],
+                            help="Baixar RNC = a O.S no Follow UP Vidros tem 'RNC'.")
 sel_tipo = f2.multiselect("Tipo", sorted(es["tipo"].dropna().unique()))
 sel_forn = f3.multiselect("Fornecedor", sorted(es["fornecedor"].dropna().unique()))
 busca = f4.text_input("Buscar (serial, descrição, código, NF ou O.S)")
@@ -45,10 +47,11 @@ COLS = {
     "emissao": ui.col_data("Emissão"), "dias_estoque": ui.col_num("Dias em estoque"), "nivel": "Nível",
     "fornecedor": "Fornecedor", "chave": "Chave NF-e",
 }
-a, b, c, d = st.columns(4)
+a, b, c, e, d = st.columns(5)
 a.metric("Itens no filtro", f"{len(v):,}".replace(",", "."))
 b.metric("Disponíveis", f"{(v['status'] == 'Disponível').sum():,}".replace(",", "."))
 c.metric("Em produção", int((v["status"] == "Produção").sum()))
+e.metric("🟠 Baixar RNC", int((v["status"] == "Baixar RNC").sum()))
 d.metric("Chave NF|Serial repetida 🔴", int(v["chave_repetida"].sum()))
 
 st.dataframe(v[list(COLS)], hide_index=True, column_config=COLS, height=560)

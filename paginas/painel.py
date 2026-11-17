@@ -5,7 +5,7 @@ import streamlit as st
 from core import db, regras, ui
 
 # cores dos gráficos (paleta validada para daltonismo: azul e laranja)
-COR_DISP, COR_PROD, COR_NOTAS = "#2a78d6", "#eb6834", "#2a78d6"
+COR_DISP, COR_PROD, COR_RNC, COR_NOTAS = "#2a78d6", "#1baf7a", "#eb6834", "#2a78d6"
 TINTA_2, GRADE = "#52514e", "#e1e0d9"
 
 
@@ -68,11 +68,12 @@ else:
 
 # ================================================================ ESTOQUE
 st.subheader(":material/inventory_2: Estoque Sicovab", divider="blue")
-c = st.columns(4)
+c = st.columns(5)
 cartao(c[0], "Itens com saldo", br(r["estoque_total"]))
 cartao(c[1], "🟢 Disponíveis", br(r["estoque_disp"]))
 cartao(c[2], "🔵 Em produção (com O.S)", br(r["estoque_prod"]), "Peças que têm O.S lançada no Follow UP Vidros.")
-cartao(c[3], f"Parados > {parado} dias", br(r["estoque_parado"]), "Disponíveis há mais tempo que o configurado.")
+cartao(c[3], "🟠 Baixar RNC", br(r["estoque_rnc"]), "A O.S no Follow UP Vidros tem 'RNC': dar baixa no Sicovab.")
+cartao(c[4], f"Parados > {parado} dias", br(r["estoque_parado"]), "Disponíveis há mais tempo que o configurado.")
 
 ef = r["estoque_fornecedor"]
 if ef.empty:
@@ -80,7 +81,7 @@ if ef.empty:
 else:
     with st.container(border=True):
         st.markdown("**Peças em estoque por fornecedor**")
-        longo = ef[["Fornecedor", "Disponíveis", "Em produção"]].melt(
+        longo = ef[["Fornecedor", "Disponíveis", "Em produção", "Baixar RNC"]].melt(
             id_vars="Fornecedor", var_name="Situação", value_name="Peças")
         ordem = list(ef["Fornecedor"])
         y = alt.Y("Fornecedor:N", sort=ordem, title=None,
@@ -88,8 +89,8 @@ else:
         barras = alt.Chart(longo).mark_bar(height=16, stroke="#ffffff", strokeWidth=2).encode(
             y=y,
             x=alt.X("sum(Peças):Q", title=None, axis=alt.Axis(grid=True, gridColor=GRADE, format="d")),
-            color=alt.Color("Situação:N", scale=alt.Scale(domain=["Disponíveis", "Em produção"],
-                                                          range=[COR_DISP, COR_PROD]),
+            color=alt.Color("Situação:N", scale=alt.Scale(domain=["Disponíveis", "Em produção", "Baixar RNC"],
+                                                          range=[COR_DISP, COR_PROD, COR_RNC]),
                             legend=alt.Legend(orient="top", title=None)),
             order=alt.Order("Situação:N", sort="ascending"),
             tooltip=[alt.Tooltip("Fornecedor:N"), alt.Tooltip("Situação:N"), alt.Tooltip("Peças:Q", format=",d")])
@@ -104,6 +105,7 @@ else:
             "Itens": st.column_config.NumberColumn("Itens", format="%d", width="small"),
             "Disponíveis": st.column_config.NumberColumn("🟢 Disponíveis", format="%d", width="small"),
             "Em produção": st.column_config.NumberColumn("🔵 Em produção", format="%d", width="small"),
+            "Baixar RNC": st.column_config.NumberColumn("🟠 Baixar RNC", format="%d", width="small"),
             "Parados": st.column_config.NumberColumn(f"Parados > {parado}d", format="%d", width="small"),
             "Participação": st.column_config.ProgressColumn("% do estoque", format="percent", min_value=0,
                                                             max_value=1, width="small"),
@@ -117,9 +119,10 @@ st.subheader(":material/fact_check: Follow UP Vidros e importações", divider="
 esq, dir_ = st.columns([2, 3], gap="medium")
 with esq.container(border=True):
     st.markdown("**Follow UP Vidros**")
-    a, b = st.columns(2)
+    a, b, c = st.columns(3)
     a.metric("Ainda no Sicovab", br(r["fu_disp"]))
-    b.metric("Já baixadas", br(r["fu_baixado"]))
+    b.metric("🟠 Baixar RNC", br(r["fu_rnc"]), help="O.S com 'RNC' e a peça ainda no estoque do Sicovab.")
+    c.metric("Já baixadas", br(r["fu_baixado"]))
     if r["fu_duplicado"]:
         st.warning(f"{r['fu_duplicado']} lançamentos com serial repetido no Follow UP.", icon=":material/warning:")
 with dir_.container(border=True):
